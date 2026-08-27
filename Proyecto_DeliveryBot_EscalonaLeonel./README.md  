@@ -1,0 +1,149 @@
+# CHANGELOG — Refactorización RestoApp
+
+## [2.0.0] Refactorización completa a MPA modular
+
+### Estructura (Ejercicio 1)
+- Vistas separadas: `index.html` (pedidos) y `admin.html` (administración).
+- `style.css` unificado, enlazado desde ambas vistas — sin estilos duplicados
+  ni reglas CSS basadas en selectores de atributo `[style*="..."]` (frágiles
+  y acoplados al marcado).
+
+### Módulos JS (Ejercicio 2)
+- `js/firebase-config.js`: único punto de inicialización de Firebase. Antes
+  la app se inicializaba dos veces (en `firebase-config.js` y en `auth.js`),
+  con configuraciones distintas — riesgo real de bugs por usar la instancia
+  equivocada.
+- `js/menu.js`: acceso a datos (`obtenerMenu`, `agregarPlato`, `eliminarPlato`),
+  con validación de entradas antes de tocar la base de datos.
+- `js/pedido.js`: lógica de negocio pura (cálculo de subtotal/IVA/total),
+  sin dependencias de DOM ni de Firebase — fácil de probar de forma aislada.
+- `js/auth.js`: identidad y sesión, separado del resto.
+- Cero variables en `window`; todo vive en el ámbito de cada módulo ES.
+
+### Autenticación y seguridad (Ejercicio 3)
+- Se reemplazó la autenticación en cliente (usuario/clave hardcodeados o
+  comparados en JS) por **Firebase Authentication** real (`signInWithEmailAndPassword`).
+- `admin.html` ya no expone el formulario de gestión por defecto: solo se
+  muestra tras una sesión válida (`onAuthStateChanged`).
+- Se añadieron reglas de Realtime Database (`database.rules.json`) que
+  restringen la escritura en `/menu` a usuarios autenticados, reforzando en
+  el servidor lo que la interfaz ya oculta en el cliente.
+- Pendiente para el estudiante: subir las reglas con `firebase deploy --only database`
+  y crear el usuario admin desde la consola de Firebase.
+
+### Limpieza y pruebas (Ejercicio 4)
+- Se eliminaron los cálculos y ramas de código inalcanzables del legacy.
+- Validaciones explícitas con mensajes claros: nombre no vacío, precio y
+  cantidad numéricos y mayores a 0, en vez de fallar en silencio con `NaN`
+  o alertas genéricas.
+- Manejo de errores con `try/catch` en cada operación asíncrona (carga de
+  menú, guardado de plato, login), mostrando feedback en la UI en lugar de
+  solo loguear en consola.
+- Se añadió `pedido.test.html`: pruebas automatizadas para las funciones
+  puras de `js/pedido.js` (cálculo de subtotal/IVA/total, formateo de
+  moneda, validaciones). Se corre igual que las demás vistas, con Live
+  Server, sin necesidad de instalar ningún framework de testing.
+
+### Buenas prácticas (Ejercicio 5)
+- Manipulación del DOM aislada dentro de los `<script type="module">` de cada
+  HTML; los cálculos y el acceso a datos viven en `js/pedido.js` y `js/menu.js`.
+- Botones deshabilitados y con texto de estado ("Guardando...") durante
+  operaciones asíncronas, para evitar envíos duplicados.
+- Formularios reales (`<form>` + `submit`) en vez de solo `click` en botones,
+  lo que habilita validación nativa del navegador y envío con Enter.
+
+## [2.0.1] Ajuste tras revisar la consola de Firebase real
+- `firebase-config.js` se completó con las credenciales reales del proyecto
+  `tallerrefactori-ia` (antes tenía placeholders).
+- Se corrigió `js/menu.js`: los datos de prueba en Realtime Database viven
+  bajo el nodo `Plaintext` con campos `{ id, name, price }`, no bajo `menu`
+  con `{ nombre, precio }` como se había asumido inicialmente. `index.html`
+  se actualizó para leer `plato.name` / `plato.price`.
+- `database.rules.json` ahora protege el nodo `Plaintext` (coincide con el
+  nombre real). Recomendado (no bloqueante): renombrar `Plaintext` → `menu`
+  desde la consola para mayor claridad; si se hace, solo hay que cambiar la
+  constante `RUTA_MENU` en `js/menu.js`.
+- Revisar la pestaña **Reglas** de Realtime Database: el modo de prueba por
+  defecto de Firebase expira a los 30 días — hay que reemplazarlo por el
+  contenido de `database.rules.json` antes de esa fecha.
+- Revisar **Authentication** en la consola: aún no hay ningún usuario creado,
+  así que el login de `admin.html` no podrá autenticar a nadie hasta crear
+  al menos un usuario con correo/contraseña.
+
+## [2.1.0] CRUD completo en el panel de administración
+- `admin.html` ahora lista todos los platos del menú (nombre + precio) con
+  un botón "✕" para eliminarlos, usando `eliminarPlato` (que ya existía en
+  `js/menu.js` pero no estaba conectado a ninguna vista).
+- La lista se re-dibuja automáticamente después de agregar o eliminar un
+  plato, y también al iniciar sesión — sin recargar la página.
+- Eliminar pide confirmación (`confirm()`) antes de borrar, para evitar
+  borrados accidentales por un clic de más.
+- Un solo listener con delegación de eventos maneja el clic de "eliminar"
+  en cualquier fila, incluidas las agregadas dinámicamente después.
+- Se evaluó integrar Pocket Flow (framework Python para agentes de IA que
+  evalúan calidad de código) como "puerta de calidad" automatizada, pero
+  no encaja en el stack de este taller (proyecto 100% estático + Firebase,
+  sin backend ni entorno Python). En su lugar, `pedido.test.html` cumple
+  ese rol como puerta de calidad simple: pruebas automatizadas que corren
+  en el navegador sin dependencias externas.
+
+## [2.2.0] Gestión de stock de materia prima + edición de precios
+- **Nueva página `stock.html`** (MPA real, no una pestaña dentro de
+  `admin.html`): gestión de inventario de materia prima — pan, carne,
+  salchicha, verduras, etc. — categorizado en Comida rápida, Almuerzo,
+  Cena elegante o General. Protegida con el mismo guard de sesión que
+  `admin.html` (`observarSesion`).
+- **Nuevo módulo `js/stock.js`**: `obtenerStock`, `agregarIngrediente`,
+  `actualizarCantidad`, `eliminarIngrediente`, más las listas cerradas
+  `CATEGORIAS_STOCK` y `UNIDADES_STOCK` para evitar valores inconsistentes
+  escritos a mano (p. ej. "Comida Rapida" vs "comida rápida").
+- Filtro por categoría en la lista de inventario, cantidad editable en
+  línea con guardado inmediato (sin recargar la página).
+- **Edición de precio de platos existentes**: `admin.html` ahora permite
+  cambiar el precio de cualquier plato ya creado directamente desde la
+  lista (input + botón guardar), usando la nueva función
+  `actualizarPrecio` en `js/menu.js` (usa `update()` de Firebase en vez de
+  `set()`, para no pisar otros campos del registro).
+- `database.rules.json` se amplió con un nodo `Stock` cuya lectura
+  *también* requiere sesión (a diferencia del menú público, el inventario
+  es información interna del negocio, no algo que el mesero necesite ver).
+
+## [3.0.0] Sistema de pedidos real: carrito, persistencia y panel de cocina
+- **`index.html` rediseñado como carrito de pedido**, no un formulario de un
+  solo plato: se ingresa el número de mesa, se agregan varios platos con su
+  cantidad, se pueden quitar antes de confirmar, y se ve el subtotal/IVA/
+  total del pedido completo en tiempo real mientras se arma.
+- **Nuevo módulo `js/pedidos.js`** (plural, no confundir con `js/pedido.js`):
+  `crearPedido`, `obtenerPedidos`, `actualizarEstadoPedido`. Es la capa de
+  persistencia — `pedido.js` sigue siendo solo cálculo puro sin Firebase.
+- **Nueva función pura `calcularTotalCarrito`** en `js/pedido.js`: suma
+  varios ítems y calcula el IVA sobre el subtotal total del pedido (como se
+  factura en la práctica), no plato por plato.
+- Los pedidos se guardan en Firebase bajo el nodo `Pedidos`, con mesa,
+  lista de ítems, subtotal/iva/total, estado inicial "Pendiente" y fecha.
+- **Nueva página `pedidos.html`** (MPA real): panel de cocina/administración
+  protegido con login, que lista todos los pedidos, permite filtrarlos por
+  estado, y cambiar el estado de cada uno (Pendiente → En preparación →
+  Listo → Entregado) con un selector inline. Se refresca sola cada 15
+  segundos además de tener botón de actualización manual.
+- `database.rules.json`: el nodo `Pedidos` quedó con lectura y escritura
+  públicas — a diferencia de `Plaintext` y `Stock`, el mesero en `index.html`
+  no tiene sesión iniciada, así que no puede cumplir `auth != null`. Esto es
+  una decisión de diseño consciente, no un descuido: cualquiera con la URL
+  de la API podría en teoría escribir pedidos falsos directamente (sin pasar
+  por la UI). Para un proyecto de taller es un trade-off aceptable; en un
+  entorno de producción real esto se resolvería con una Cloud Function que
+  valide la escritura, o con un token de sesión de "mesero" más limitado
+  que el de administrador.
+
+## Pendiente sugerido para estudiantes
+- Ampliar `pedido.test.html` con más casos a medida que se agreguen
+  funciones nuevas a `js/pedido.js` o `js/pedidos.js`.
+- Vincular cada plato del menú con los ingredientes de `stock.html` que
+  consume, para descontar stock automáticamente al confirmar un pedido en
+  `index.html`.
+- Restringir la escritura del nodo `Pedidos` con una Cloud Function o un
+  esquema de autenticación más granular (rol "mesero" vs rol "admin").
+- Si en el futuro el taller suma un backend real, ahí sí Pocket Flow
+  encajaría de forma natural para orquestar revisiones automáticas de
+  código con un LLM antes de cada despliegue.
