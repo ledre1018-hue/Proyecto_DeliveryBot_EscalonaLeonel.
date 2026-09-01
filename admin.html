@@ -3,269 +3,231 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RestoApp - Toma de Pedidos</title>
+  <title>DeliveryBot - Gestión de Menú</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="contenedor-principal contenedor-ancho">
-    <h2>RestoApp — Mesero</h2>
-
-    <div class="fila-form">
-      <div class="item">
-        <label for="tipo-pedido">Tipo de pedido</label>
-        <select id="tipo-pedido" required>
-          <option value="Mesa">Mesa (comer en el restaurante)</option>
-          <option value="Domicilio">Domicilio</option>
-          <option value="Reserva">Reserva</option>
-        </select>
-      </div>
-      <div class="item">
-        <label for="mesa" id="label-mesa">Número de mesa</label>
-        <input type="text" id="mesa" placeholder="Ej. Mesa 4" required>
-      </div>
-    </div>
-
-    <form id="form-agregar">
-      <div class="fila-form">
+    <section id="vista-login">
+      <h2>Acceso Administrador</h2>
+      <p class="texto-ayuda">Inicia sesión para gestionar el menú.</p>
+      <form id="form-login">
         <div class="item">
-          <label for="select-menu">Plato</label>
-          <select id="select-menu" required>
-            <option value="">--Cargando menú--</option>
-          </select>
+          <label for="email">Correo</label>
+          <input type="email" id="email" autocomplete="username" required>
         </div>
         <div class="item">
-          <label for="cantidad">Cantidad</label>
-          <input type="number" id="cantidad" min="1" value="1" required>
+          <label for="password">Contraseña</label>
+          <input type="password" id="password" autocomplete="current-password" required>
         </div>
+        <button type="submit" id="btn-login">INICIAR SESIÓN</button>
+      </form>
+      <div id="res-login" role="status" aria-live="polite"></div>
+    </section>
+
+    <section id="vista-admin" class="oculto">
+      <div class="admin-header">
+        <h2>Gestión de Menú</h2>
+        <button type="button" id="btn-logout" class="btn-secundario">Cerrar sesión</button>
       </div>
-      <button type="submit" id="btn-agregar" class="btn-secundario">+ Agregar al pedido</button>
-    </form>
 
-    <div class="lista-header">
-      <h3>Pedido actual</h3>
-      <span id="contador-items" class="badge-contador">0</span>
-    </div>
-    <ul id="carrito-lista" class="lista-platos">
-      <li class="lista-vacia">Todavía no agregaste ningún plato.</li>
-    </ul>
+      <form id="form-menu">
+        <div class="fila-form">
+          <div class="item">
+            <label for="nombre-plato">Nombre del plato</label>
+            <input type="text" id="nombre-plato" placeholder="Ej. Café Americano" required>
+          </div>
+          <div class="item">
+            <label for="precio-plato">Precio</label>
+            <input type="number" id="precio-plato" min="1" step="any" placeholder="Ej. 3500" required>
+          </div>
+        </div>
+        <div class="fila-form">
+          <div class="item">
+            <label for="categoria-plato">Categoría</label>
+            <select id="categoria-plato" required></select>
+          </div>
+          <div class="item">
+            <label for="stock-plato">Stock inicial</label>
+            <input type="number" id="stock-plato" min="0" step="1" placeholder="Ej. 20" required>
+          </div>
+        </div>
+        <div class="item">
+          <label for="descripcion-plato">Descripción</label>
+          <input type="text" id="descripcion-plato" placeholder="Ej. Café negro 250ml">
+        </div>
+        <button type="submit" id="btn-guardar">AGREGAR PLATO</button>
+      </form>
 
-    <div id="carrito-totales" class="carrito-totales oculto">
-      <div class="fila-total"><span>Subtotal</span><span id="txt-subtotal">$0</span></div>
-      <div class="fila-total"><span>IVA (19%)</span><span id="txt-iva">$0</span></div>
-      <div class="fila-total fila-total-grande"><span>Total</span><span id="txt-total">$0</span></div>
-    </div>
+      <div id="res-menu" role="status" aria-live="polite"></div>
 
-    <button type="button" id="btn-confirmar">CONFIRMAR PEDIDO</button>
+      <div class="lista-header">
+        <h3>Menú actual</h3>
+      </div>
+      <ul id="lista-menu" class="lista-platos">
+        <li class="lista-vacia">Cargando menú...</li>
+      </ul>
 
-    <div id="res" role="status" aria-live="polite"></div>
-
-    <div class="nav-link">
-      <a href="admin.html">Ir al Panel de Administración</a>
-    </div>
+      <div class="nav-link">
+        <a href="comanda.html">Ver pedidos</a> ·
+        <a href="stock.html">Gestionar stock</a> ·
+        <a href="index.html">Inicio</a>
+      </div>
+    </section>
   </div>
 
   <script type="module">
-    import { obtenerMenu } from "./js/menu.js";
-    import { crearPedido } from "./js/pedidos.js";
-    import { calcularTotalCarrito, formatearMoneda } from "./js/pedido.js";
+    import { iniciarSesion, cerrarSesion, observarSesion, mensajeErrorAuth } from "./js/auth.js";
+    import { obtenerMenu, agregarPlato, actualizarPlato, eliminarPlato, CATEGORIAS_MENU } from "./js/menu.js";
+    import { formatearMoneda } from "./js/pedido.js";
+
+    const vistaLogin = document.getElementById("vista-login");
+    const vistaAdmin = document.getElementById("vista-admin");
+    const formLogin = document.getElementById("form-login");
+    const btnLogin = document.getElementById("btn-login");
+    const resLogin = document.getElementById("res-login");
+    const btnLogout = document.getElementById("btn-logout");
+    const formMenu = document.getElementById("form-menu");
+    const inputNombre = document.getElementById("nombre-plato");
+    const inputPrecio = document.getElementById("precio-plato");
+    const selectCategoria = document.getElementById("categoria-plato");
+    const inputStock = document.getElementById("stock-plato");
+    const inputDescripcion = document.getElementById("descripcion-plato");
+    const btnGuardar = document.getElementById("btn-guardar");
+    const resMenu = document.getElementById("res-menu");
+    const listaMenu = document.getElementById("lista-menu");
 
     let menuCache = {};
-    let carrito = [];
 
-    const selectTipoPedido = document.getElementById('tipo-pedido');
-    const labelMesa = document.getElementById('label-mesa');
-    const inputMesa = document.getElementById('mesa');
-
-    const formAgregar = document.getElementById('form-agregar');
-    const selectMenu = document.getElementById('select-menu');
-    const inputCantidad = document.getElementById('cantidad');
-
-    const carritoLista = document.getElementById('carrito-lista');
-    const contadorItems = document.getElementById('contador-items');
-    const carritoTotales = document.getElementById('carrito-totales');
-    const txtSubtotal = document.getElementById('txt-subtotal');
-    const txtIva = document.getElementById('txt-iva');
-    const txtTotal = document.getElementById('txt-total');
-
-    const btnConfirmar = document.getElementById('btn-confirmar');
-    const divRes = document.getElementById('res');
-
-    const ETIQUETAS_CAMPO = {
-      Mesa: { label: 'Número de mesa', placeholder: 'Ej. Mesa 4' },
-      Domicilio: { label: 'Dirección de entrega', placeholder: 'Ej. Calle 45 #12-30' },
-      Reserva: { label: 'Fecha y hora de la reserva', placeholder: 'Ej. 28/08 8:00 PM, a nombre de...' },
-    };
-
-    function mostrarMensaje(texto, tipo = 'exito') {
-      divRes.textContent = texto;
-      divRes.classList.remove('mensaje-error', 'mensaje-exito');
-      divRes.classList.add(tipo === 'error' ? 'mensaje-error' : 'mensaje-exito');
+    function mostrarMensaje(el, texto, tipo = "exito") {
+      el.textContent = texto;
+      el.classList.remove("mensaje-error", "mensaje-exito");
+      el.classList.add(tipo === "error" ? "mensaje-error" : "mensaje-exito");
     }
 
-    function actualizarEtiquetaCampo() {
-      const config = ETIQUETAS_CAMPO[selectTipoPedido.value];
-      labelMesa.textContent = config.label;
-      inputMesa.placeholder = config.placeholder;
-      inputMesa.value = '';
+    function poblarCategorias() {
+      selectCategoria.innerHTML = CATEGORIAS_MENU
+        .map((c) => `<option value="${c}">${c}</option>`)
+        .join("");
     }
 
-    async function inicializarMenu() {
+    async function renderizarMenu() {
       try {
         menuCache = await obtenerMenu();
         const entradas = Object.entries(menuCache);
-
         if (entradas.length === 0) {
-          selectMenu.innerHTML = '<option value="">--No hay platos disponibles--</option>';
+          listaMenu.innerHTML = '<li class="lista-vacia">No hay platos en el menú.</li>';
           return;
         }
-
-        selectMenu.innerHTML = '<option value="">--Selecciona un plato--</option>';
+        listaMenu.innerHTML = "";
         entradas.forEach(([id, plato]) => {
-          const opt = document.createElement('option');
-          opt.value = id;
-          opt.textContent = `${plato.name} (${formatearMoneda(plato.price)})`;
-          selectMenu.appendChild(opt);
+          const li = document.createElement("li");
+          li.className = "fila-plato";
+          li.innerHTML = `
+            <span class="fila-plato-nombre">
+              ${plato.nombre}
+              <span class="etiqueta-categoria">${plato.categoria}</span>
+            </span>
+            <input type="number" class="input-precio-fila" min="1" step="any" value="${plato.precio}" data-id="${id}" aria-label="Precio de ${plato.nombre}">
+            <button type="button" class="btn-guardar-precio" data-id="${id}" title="Guardar cambios">💾</button>
+            <button type="button" class="btn-eliminar" data-id="${id}" aria-label="Eliminar ${plato.nombre}">✕</button>
+          `;
+          listaMenu.appendChild(li);
         });
       } catch (error) {
-        console.error("Error al cargar el menú:", error);
-        selectMenu.innerHTML = '<option value="">--Error al cargar el menú--</option>';
-        mostrarMensaje('No se pudo cargar el menú. Revisa tu conexión e intenta de nuevo.', 'error');
+        console.error("Error al listar menú:", error);
+        listaMenu.innerHTML = '<li class="lista-vacia">No se pudo cargar el menú.</li>';
       }
     }
 
-    function renderizarCarrito() {
-      contadorItems.textContent = carrito.length;
-
-      if (carrito.length === 0) {
-        carritoLista.innerHTML = '<li class="lista-vacia">Todavía no agregaste ningún plato.</li>';
-        carritoTotales.classList.add('oculto');
-        btnConfirmar.disabled = true;
+    listaMenu.addEventListener("click", async (evento) => {
+      const botonGuardar = evento.target.closest(".btn-guardar-precio");
+      if (botonGuardar) {
+        const id = botonGuardar.dataset.id;
+        const input = listaMenu.querySelector(`.input-precio-fila[data-id="${id}"]`);
+        botonGuardar.disabled = true;
+        try {
+          await actualizarPlato(id, { precio: Number(input.value) });
+          menuCache[id].precio = Number(input.value);
+          mostrarMensaje(resMenu, "Precio actualizado correctamente.");
+        } catch (error) {
+          console.error("Error al actualizar precio:", error);
+          mostrarMensaje(resMenu, error.message || "No se pudo actualizar el precio.", "error");
+        } finally {
+          botonGuardar.disabled = false;
+        }
         return;
       }
 
-      carritoLista.innerHTML = '';
-      carrito.forEach((item, indice) => {
-        const li = document.createElement('li');
-        li.className = 'fila-plato';
-        li.innerHTML = `
-          <span class="fila-plato-nombre">${item.nombre} × ${item.cantidad}</span>
-          <span class="fila-plato-precio">${formatearMoneda(item.cantidad * item.precioUnitario)}</span>
-          <button type="button" class="btn-eliminar" data-indice="${indice}" aria-label="Quitar ${item.nombre}">✕</button>
-        `;
-        carritoLista.appendChild(li);
-      });
-
-      const { subtotal, iva, total } = calcularTotalCarrito(
-        carrito.map(({ cantidad, precioUnitario }) => ({ cantidad, precioUnitario }))
-      );
-      txtSubtotal.textContent = formatearMoneda(subtotal);
-      txtIva.textContent = formatearMoneda(iva);
-      txtTotal.textContent = formatearMoneda(total);
-      carritoTotales.classList.remove('oculto');
-      btnConfirmar.disabled = false;
-    }
-
-    selectTipoPedido.addEventListener('change', actualizarEtiquetaCampo);
-
-    formAgregar.addEventListener('submit', (evento) => {
-      evento.preventDefault();
-
-      const platoId = selectMenu.value;
-      const plato = menuCache[platoId];
-      const cantidad = Number(inputCantidad.value);
-
-      if (!plato) {
-        mostrarMensaje('Selecciona un plato válido antes de agregarlo.', 'error');
-        return;
-      }
-      if (!Number.isFinite(cantidad) || cantidad <= 0) {
-        mostrarMensaje('La cantidad debe ser mayor a 0.', 'error');
-        return;
-      }
-
-      const existente = carrito.find((item) => item.platoId === platoId);
-      if (existente) {
-        existente.cantidad += cantidad;
-      } else {
-        carrito.push({
-          platoId,
-          nombre: plato.name,
-          precioUnitario: plato.price,
-          cantidad,
-        });
-      }
-
-      formAgregar.reset();
-      inputCantidad.value = 1;
-      renderizarCarrito();
-    });
-
-    carritoLista.addEventListener('click', (evento) => {
-      const boton = evento.target.closest('.btn-eliminar');
+      const boton = evento.target.closest(".btn-eliminar");
       if (!boton) return;
-      carrito.splice(Number(boton.dataset.indice), 1);
-      renderizarCarrito();
-    });
-
-    btnConfirmar.addEventListener('click', async () => {
-      const mesaODireccion = inputMesa.value.trim();
-
-      if (!mesaODireccion) {
-        mostrarMensaje(`Completa "${labelMesa.textContent}" antes de confirmar.`, 'error');
-        inputMesa.focus();
-        return;
-      }
-      if (carrito.length === 0) {
-        mostrarMensaje('Agrega al menos un plato antes de confirmar.', 'error');
-        return;
-      }
-
-      btnConfirmar.disabled = true;
-      btnConfirmar.textContent = 'Enviando pedido...';
-
+      const id = boton.dataset.id;
+      const nombre = menuCache[id]?.nombre;
+      if (!confirm(`¿Eliminar "${nombre}" del menú?`)) return;
+      boton.disabled = true;
       try {
-        const { subtotal, iva, total } = calcularTotalCarrito(
-          carrito.map(({ cantidad, precioUnitario }) => ({ cantidad, precioUnitario }))
-        );
-
-        const items = carrito.map(({ platoId, nombre, precioUnitario, cantidad }) => ({
-          platoId,
-          nombre,
-          precioUnitario,
-          cantidad,
-          subtotal: precioUnitario * cantidad,
-        }));
-
-        const resultado = await crearPedido({
-          tipoPedido: selectTipoPedido.value,
-          mesaODireccion,
-          items,
-          subtotal,
-          iva,
-          total,
-        });
-
-        const idPedido = resultado?.id || 'nuevo';
-        mostrarMensaje(
-          `Pedido #${String(idPedido).slice(-6)} enviado (${selectTipoPedido.value}) — Total: ${formatearMoneda(total)}`
-        );
-
-        carrito = [];
-        renderizarCarrito();
+        await eliminarPlato(id);
+        mostrarMensaje(resMenu, `"${nombre}" fue eliminado del menú.`);
+        await renderizarMenu();
       } catch (error) {
-        console.error('Error al confirmar pedido:', error);
-        mostrarMensaje(error.message || 'No se pudo enviar el pedido. Intenta de nuevo.', 'error');
-      } finally {
-        btnConfirmar.disabled = carrito.length === 0;
-        btnConfirmar.textContent = 'CONFIRMAR PEDIDO';
+        console.error("Error al eliminar plato:", error);
+        mostrarMensaje(resMenu, error.message || "No se pudo eliminar el plato.", "error");
+        boton.disabled = false;
       }
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-      actualizarEtiquetaCampo();
-      renderizarCarrito();
-      inicializarMenu();
+    observarSesion((token) => {
+      const haySesion = Boolean(token);
+      vistaLogin.classList.toggle("oculto", haySesion);
+      vistaAdmin.classList.toggle("oculto", !haySesion);
+      if (haySesion) renderizarMenu();
     });
+
+    formLogin.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+      btnLogin.disabled = true;
+      btnLogin.textContent = "Ingresando...";
+      resLogin.textContent = "";
+      try {
+        await iniciarSesion(email, password);
+        formLogin.reset();
+      } catch (error) {
+        mostrarMensaje(resLogin, mensajeErrorAuth(error), "error");
+      } finally {
+        btnLogin.disabled = false;
+        btnLogin.textContent = "INICIAR SESIÓN";
+      }
+    });
+
+    btnLogout.addEventListener("click", () => cerrarSesion());
+
+    formMenu.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      btnGuardar.disabled = true;
+      btnGuardar.textContent = "Guardando...";
+      try {
+        await agregarPlato({
+          nombre: inputNombre.value,
+          descripcion: inputDescripcion.value,
+          precio: inputPrecio.value,
+          categoria: selectCategoria.value,
+          stock: inputStock.value,
+        });
+        mostrarMensaje(resMenu, "¡Plato agregado al menú!");
+        formMenu.reset();
+        await renderizarMenu();
+      } catch (error) {
+        console.error("Error al guardar plato:", error);
+        mostrarMensaje(resMenu, error.message || "Error al guardar el plato.", "error");
+      } finally {
+        btnGuardar.disabled = false;
+        btnGuardar.textContent = "AGREGAR PLATO";
+      }
+    });
+
+    poblarCategorias();
   </script>
 </body>
 </html>

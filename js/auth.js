@@ -17,10 +17,12 @@ export async function iniciarSesion(email, password) {
   notificarCambioSesion();
   return resultado.token;
 }
+
 export function cerrarSesion() {
   sessionStorage.removeItem(CLAVE_SESION);
   notificarCambioSesion();
 }
+
 export function obtenerToken() {
   return sessionStorage.getItem(CLAVE_SESION);
 }
@@ -29,6 +31,7 @@ export function observarSesion(callback) {
   listeners.push(callback);
   callback(obtenerToken());
 }
+
 export function mensajeErrorAuth(error) {
   return error?.message || "No se pudo iniciar sesión. Intenta nuevamente.";
 }

@@ -3,232 +3,197 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>RestoApp - Toma de Pedidos</title>
+  <title>DeliveryBot - Mesero</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="contenedor-principal contenedor-ancho">
+  <div class="contenedor-principal">
     <h2>RestoApp — Mesero</h2>
 
     <div class="item">
-      <label for="mesa">Mesa</label>
-      <input type="text" id="mesa" placeholder="Ej. Mesa 4 / Barra 2" required>
+      <label for="input-mesa">Mesa</label>
+      <input type="text" id="input-mesa" placeholder="Ej. Mesa 4 / Barra 2" required>
     </div>
 
-    <form id="form-agregar">
-      <div class="fila-form">
-        <div class="item">
-          <label for="select-menu">Plato</label>
-          <select id="select-menu" required>
-            <option value="">--Cargando menú--</option>
-          </select>
-        </div>
-        <div class="item">
-          <label for="cantidad">Cantidad</label>
-          <input type="number" id="cantidad" min="1" value="1" required>
-        </div>
+    <div class="fila-form">
+      <div class="item">
+        <label for="select-plato">Plato</label>
+        <select id="select-plato">
+          <option value="">--Selecciona un plato--</option>
+        </select>
       </div>
-      <button type="submit" id="btn-agregar" class="btn-secundario">+ Agregar al pedido</button>
-    </form>
+      <div class="item">
+        <label for="input-cantidad">Cantidad</label>
+        <input type="number" id="input-cantidad" min="1" step="1" value="1">
+      </div>
+    </div>
+
+    <button type="button" id="btn-agregar-carrito">+ Agregar al pedido</button>
+
+    <div id="res-mesero" role="status" aria-live="polite"></div>
 
     <div class="lista-header">
       <h3>Pedido actual</h3>
-      <span id="contador-items" class="badge-contador">0</span>
+      <span class="badge-contador" id="contador-carrito">0</span>
     </div>
-    <ul id="carrito-lista" class="lista-platos">
+    <ul id="lista-carrito" class="lista-platos">
       <li class="lista-vacia">Todavía no agregaste ningún plato.</li>
     </ul>
 
-    <div id="carrito-totales" class="carrito-totales oculto">
-      <div class="fila-total"><span>Subtotal</span><span id="txt-subtotal">$0</span></div>
-      <div class="fila-total"><span>IVA (19%)</span><span id="txt-iva">$0</span></div>
-      <div class="fila-total fila-total-grande"><span>Total</span><span id="txt-total">$0</span></div>
+    <div class="carrito-totales">
+      <div class="fila-total fila-total-grande">
+        <span>Total</span>
+        <span id="total-carrito">$0</span>
+      </div>
     </div>
 
-    <button type="button" id="btn-confirmar">CONFIRMAR PEDIDO</button>
-
-    <div id="res" role="status" aria-live="polite"></div>
+    <button type="button" id="btn-confirmar-pedido">CONFIRMAR PEDIDO</button>
 
     <div class="nav-link">
-      <a href="admin.html">Ir al Panel de Administración</a>
+      ¿Prefieres pedir desde tu celular?
+      <a href="https://t.me/hollw55bot" target="_blank" rel="noopener">Pide por Telegram</a>
+    </div>
+
+    <div class="nav-link">
+      <a href="admin.html">Panel de Administración</a> ·
+      <a href="comanda.html">Panel de Cocina</a> ·
+      <a href="stock.html">Gestionar Stock</a>
     </div>
   </div>
 
   <script type="module">
     import { obtenerMenu } from "./js/menu.js";
     import { crearPedido } from "./js/pedidos.js";
-    import { calcularTotalCarrito, formatearMoneda } from "./js/pedido.js";
+    import { formatearMoneda } from "./js/pedido.js";
+
+    const inputMesa = document.getElementById("input-mesa");
+    const selectPlato = document.getElementById("select-plato");
+    const inputCantidad = document.getElementById("input-cantidad");
+    const btnAgregarCarrito = document.getElementById("btn-agregar-carrito");
+    const resMesero = document.getElementById("res-mesero");
+    const listaCarrito = document.getElementById("lista-carrito");
+    const contadorCarrito = document.getElementById("contador-carrito");
+    const totalCarritoEl = document.getElementById("total-carrito");
+    const btnConfirmarPedido = document.getElementById("btn-confirmar-pedido");
 
     let menuCache = {};
     let carrito = [];
 
-    const inputMesa = document.getElementById('mesa');
-    const formAgregar = document.getElementById('form-agregar');
-    const selectMenu = document.getElementById('select-menu');
-    const inputCantidad = document.getElementById('cantidad');
-
-    const carritoLista = document.getElementById('carrito-lista');
-    const contadorItems = document.getElementById('contador-items');
-    const carritoTotales = document.getElementById('carrito-totales');
-    const txtSubtotal = document.getElementById('txt-subtotal');
-    const txtIva = document.getElementById('txt-iva');
-    const txtTotal = document.getElementById('txt-total');
-
-    const btnConfirmar = document.getElementById('btn-confirmar');
-    const divRes = document.getElementById('res');
-
-    function mostrarMensaje(texto, tipo = 'exito') {
-      divRes.textContent = texto;
-      divRes.classList.remove('mensaje-error', 'mensaje-exito');
-      divRes.classList.add(tipo === 'error' ? 'mensaje-error' : 'mensaje-exito');
+    function mostrarMensaje(texto, tipo = "exito") {
+      resMesero.textContent = texto;
+      resMesero.classList.remove("mensaje-error", "mensaje-exito");
+      resMesero.classList.add(tipo === "error" ? "mensaje-error" : "mensaje-exito");
     }
 
-    async function inicializarMenu() {
-      try {
-        menuCache = await obtenerMenu();
-        const entradas = Object.entries(menuCache);
-
-        if (entradas.length === 0) {
-          selectMenu.innerHTML = '<option value="">--No hay platos disponibles--</option>';
-          return;
-        }
-
-        selectMenu.innerHTML = '<option value="">--Selecciona un plato--</option>';
-        entradas.forEach(([id, plato]) => {
-          const opt = document.createElement('option');
-          opt.value = id;
-          opt.textContent = `${plato.name} (${formatearMoneda(plato.price)})`;
-          selectMenu.appendChild(opt);
-        });
-      } catch (error) {
-        console.error("Error al cargar el menú:", error);
-        selectMenu.innerHTML = '<option value="">--Error al cargar el menú--</option>';
-        mostrarMensaje('No se pudo cargar el menú. Revisa tu conexión e intenta de nuevo.', 'error');
-      }
+    function calcularTotal() {
+      return carrito.reduce((acc, item) => acc + item.precio * item.cantidad, 0);
     }
 
     function renderizarCarrito() {
-      contadorItems.textContent = carrito.length;
+      contadorCarrito.textContent = carrito.length;
+      totalCarritoEl.textContent = formatearMoneda(calcularTotal());
 
       if (carrito.length === 0) {
-        carritoLista.innerHTML = '<li class="lista-vacia">Todavía no agregaste ningún plato.</li>';
-        carritoTotales.classList.add('oculto');
-        btnConfirmar.disabled = true;
+        listaCarrito.innerHTML = '<li class="lista-vacia">Todavía no agregaste ningún plato.</li>';
         return;
       }
 
-      carritoLista.innerHTML = '';
+      listaCarrito.innerHTML = "";
       carrito.forEach((item, indice) => {
-        const li = document.createElement('li');
-        li.className = 'fila-plato';
+        const li = document.createElement("li");
+        li.className = "fila-plato";
         li.innerHTML = `
-          <span class="fila-plato-nombre">${item.nombre} × ${item.cantidad}</span>
-          <span class="fila-plato-precio">${formatearMoneda(item.cantidad * item.precioUnitario)}</span>
-          <button type="button" class="btn-eliminar" data-indice="${indice}" aria-label="Quitar ${item.nombre}">✕</button>
+          <span class="fila-plato-nombre">${item.cantidad} x ${item.nombre}</span>
+          <span class="fila-plato-precio">${formatearMoneda(item.precio * item.cantidad)}</span>
+          <button type="button" class="btn-eliminar" data-indice="${indice}">✕</button>
         `;
-        carritoLista.appendChild(li);
+        listaCarrito.appendChild(li);
       });
-
-      const { subtotal, iva, total } = calcularTotalCarrito(
-        carrito.map(({ cantidad, precioUnitario }) => ({ cantidad, precioUnitario }))
-      );
-      txtSubtotal.textContent = formatearMoneda(subtotal);
-      txtIva.textContent = formatearMoneda(iva);
-      txtTotal.textContent = formatearMoneda(total);
-      carritoTotales.classList.remove('oculto');
-      btnConfirmar.disabled = false;
     }
 
-    formAgregar.addEventListener('submit', (evento) => {
-      evento.preventDefault();
+    async function cargarMenu() {
+      try {
+        menuCache = await obtenerMenu();
+        const entradas = Object.entries(menuCache);
+        selectPlato.innerHTML =
+          '<option value="">--Selecciona un plato--</option>' +
+          entradas
+            .map(([id, plato]) => `<option value="${id}">${plato.nombre} - ${formatearMoneda(plato.precio)}</option>`)
+            .join("");
+      } catch (error) {
+        console.error("Error al cargar menú:", error);
+        mostrarMensaje("No se pudo cargar el menú.", "error");
+      }
+    }
 
-      const platoId = selectMenu.value;
-      const plato = menuCache[platoId];
+    btnAgregarCarrito.addEventListener("click", () => {
+      const idPlato = selectPlato.value;
       const cantidad = Number(inputCantidad.value);
 
-      if (!plato) {
-        mostrarMensaje('Selecciona un plato válido antes de agregarlo.', 'error');
+      if (!idPlato) {
+        mostrarMensaje("Selecciona un plato.", "error");
         return;
       }
       if (!Number.isFinite(cantidad) || cantidad <= 0) {
-        mostrarMensaje('La cantidad debe ser mayor a 0.', 'error');
+        mostrarMensaje("Ingresa una cantidad válida.", "error");
         return;
       }
 
-      const existente = carrito.find((item) => item.platoId === platoId);
-      if (existente) {
-        existente.cantidad += cantidad;
+      const plato = menuCache[idPlato];
+      const itemExistente = carrito.find((item) => item.id === idPlato);
+      if (itemExistente) {
+        itemExistente.cantidad += cantidad;
       } else {
-        carrito.push({
-          platoId,
-          nombre: plato.name,
-          precioUnitario: plato.price,
-          cantidad,
-        });
+        carrito.push({ id: idPlato, nombre: plato.nombre, precio: plato.precio, cantidad });
       }
 
-      formAgregar.reset();
+      selectPlato.value = "";
       inputCantidad.value = 1;
+      resMesero.textContent = "";
       renderizarCarrito();
     });
 
-    carritoLista.addEventListener('click', (evento) => {
-      const boton = evento.target.closest('.btn-eliminar');
+    listaCarrito.addEventListener("click", (evento) => {
+      const boton = evento.target.closest(".btn-eliminar");
       if (!boton) return;
-      carrito.splice(Number(boton.dataset.indice), 1);
+      const indice = Number(boton.dataset.indice);
+      carrito.splice(indice, 1);
       renderizarCarrito();
     });
 
-    btnConfirmar.addEventListener('click', async () => {
+    btnConfirmarPedido.addEventListener("click", async () => {
       const mesa = inputMesa.value.trim();
 
       if (!mesa) {
-        mostrarMensaje('Indica el número o nombre de la mesa antes de confirmar.', 'error');
-        inputMesa.focus();
+        mostrarMensaje("Indica la mesa o el punto de entrega.", "error");
         return;
       }
       if (carrito.length === 0) {
-        mostrarMensaje('Agrega al menos un plato antes de confirmar.', 'error');
+        mostrarMensaje("Agrega al menos un plato al pedido.", "error");
         return;
       }
 
-      btnConfirmar.disabled = true;
-      btnConfirmar.textContent = 'Enviando pedido...';
+      const detalles = carrito.map((item) => `${item.cantidad}x ${item.nombre}`).join(", ");
+      const total = calcularTotal();
 
+      btnConfirmarPedido.disabled = true;
+      btnConfirmarPedido.textContent = "Enviando...";
       try {
-        const { subtotal, iva, total } = calcularTotalCarrito(
-          carrito.map(({ cantidad, precioUnitario }) => ({ cantidad, precioUnitario }))
-        );
-
-        const items = carrito.map(({ platoId, nombre, precioUnitario, cantidad }) => ({
-          platoId,
-          nombre,
-          precioUnitario,
-          cantidad,
-          subtotal: precioUnitario * cantidad,
-        }));
-
-        const idPedido = await crearPedido({ mesa, items, subtotal, iva, total });
-
-        mostrarMensaje(
-          `Pedido #${idPedido.slice(-6)} enviado para ${mesa} — Total: ${formatearMoneda(total)}`
-        );
-
+        await crearPedido({ idUsuario: mesa, detallesPedido: detalles, totalPago: total });
+        mostrarMensaje("¡Pedido enviado a cocina!");
         carrito = [];
+        inputMesa.value = "";
         renderizarCarrito();
       } catch (error) {
-        console.error('Error al confirmar pedido:', error);
-        mostrarMensaje(error.message || 'No se pudo enviar el pedido. Intenta de nuevo.', 'error');
+        console.error("Error al confirmar pedido:", error);
+        mostrarMensaje(error.message || "No se pudo enviar el pedido.", "error");
       } finally {
-        btnConfirmar.disabled = carrito.length === 0;
-        btnConfirmar.textContent = 'CONFIRMAR PEDIDO';
+        btnConfirmarPedido.disabled = false;
+        btnConfirmarPedido.textContent = "CONFIRMAR PEDIDO";
       }
     });
 
-    document.addEventListener('DOMContentLoaded', () => {
-      renderizarCarrito();
-      inicializarMenu();
-    });
+    cargarMenu();
   </script>
 </body>
 </html>
